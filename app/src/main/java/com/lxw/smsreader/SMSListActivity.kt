@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -380,22 +381,22 @@ fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
                             Text(
                                 text = messageInfo.time,
                                 style = MaterialTheme.typography.displaySmall.copy(
-                                    color = Color.DarkGray
-                                ),
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.weight(1.0f)
+                                    color = Color.DarkGray,
+                                    fontSize = 45.sp
+                                )
                             )
                             if (messageGroupInfo.unReadCount > 0) {
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Box(
                                     modifier = Modifier
                                         .background(Color.Red, shape = CircleShape)
-                                        .padding(horizontal = 15.dp, vertical = 2.dp)
+                                        .padding(horizontal = 5.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = messageGroupInfo.unReadCount.toString(),
                                         style = MaterialTheme.typography.displaySmall.copy(
-                                            color = Color.White
+                                            color = Color.White,
+                                            fontSize = 40.sp
                                         ),
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.align(Alignment.Center)
@@ -407,7 +408,7 @@ fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
                         Text(
                             text = messageInfo.body,
                             style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
-                            textAlign = TextAlign.End,
+                            textAlign = TextAlign.Start,
                             maxLines = 3,
                             fontWeight = FontWeight.Bold,
                             overflow = TextOverflow.Ellipsis
