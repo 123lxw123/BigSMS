@@ -25,10 +25,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -48,7 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -364,7 +361,7 @@ fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
                     context.startActivity(intent)
                 }) {
                     Column() {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                         if (!TextUtils.isEmpty(messageInfo.contract)) {
                             Text(
                                 text = messageInfo.contract!!,
@@ -383,25 +380,22 @@ fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
                             Text(
                                 text = messageInfo.time,
                                 style = MaterialTheme.typography.displaySmall.copy(
-                                    color = Color.DarkGray,
-                                    fontSize = 36.sp
+                                    color = Color.DarkGray
                                 ),
-                                textAlign = TextAlign.End
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1.0f)
                             )
                             if (messageGroupInfo.unReadCount > 0) {
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Box(
                                     modifier = Modifier
                                         .background(Color.Red, shape = CircleShape)
-                                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                                        .heightIn(min = 36.dp) // 确保最小高度
-                                        .widthIn(min = 36.dp) // 确保最小高度
+                                        .padding(horizontal = 15.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = messageGroupInfo.unReadCount.toString(),
                                         style = MaterialTheme.typography.displaySmall.copy(
-                                            color = Color.White,
-                                            fontSize = 36.sp
+                                            color = Color.White
                                         ),
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.align(Alignment.Center)
@@ -418,7 +412,7 @@ fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
                             fontWeight = FontWeight.Bold,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(15.dp))
                         HorizontalDivider()
                     }
                 }

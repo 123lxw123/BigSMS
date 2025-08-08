@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,12 +29,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -78,6 +86,7 @@ fun SMSChatPage(messageInfoList: List<MessageInfo>, modifier: Modifier = Modifie
         messageInfoList.toList()
     }
     val context = LocalContext.current
+
     Column(
         modifier = modifier
             .background(Color.White)
@@ -93,7 +102,7 @@ fun SMSChatPage(messageInfoList: List<MessageInfo>, modifier: Modifier = Modifie
                 painter = painterResource(id = R.drawable.back),
                 contentDescription = "返回",
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(40.dp)
                     .clickable {
                         (context as Activity).finish()
                     }
@@ -128,13 +137,13 @@ fun SMSChatPage(messageInfoList: List<MessageInfo>, modifier: Modifier = Modifie
         ) {
             items(messages) { messageInfo ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = messageInfo.time,
                         color = Color.Black,
                         style = MaterialTheme.typography.displaySmall
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     Row {
                         if (messageInfo.type != 1) {
                             Spacer(modifier = Modifier.width(30.dp))
@@ -150,19 +159,17 @@ fun SMSChatPage(messageInfoList: List<MessageInfo>, modifier: Modifier = Modifie
                                 Box(
                                     modifier = Modifier
                                         .background(Color.White)
+                                        .padding(15.dp)
                                 ) {
-                                    TextField(
+                                    BasicTextField(
                                         value = messageInfo.body,
                                         onValueChange = { /* 禁用编辑 */ },
                                         readOnly = true,
                                         textStyle = MaterialTheme.typography.displaySmall
-                                            .copy(color = Color.Black),
-                                        colors = TextFieldDefaults.colors(
-                                            focusedContainerColor = Color.White, // 聚焦时背景色
-                                            unfocusedContainerColor = Color.White, // 非聚焦时背景色
-                                            focusedIndicatorColor = Color.Transparent, // 聚焦时下划线颜色（设为透明）
-                                            unfocusedIndicatorColor = Color.Transparent // 非聚焦时下划线颜色（设为透明）
-                                        )
+                                            .copy(
+                                                color = Color.Black
+                                            ),
+                                        modifier = Modifier.width(IntrinsicSize.Min)
                                     )
                                 }
                                 if (messageInfo.type == 1) {
@@ -175,7 +182,7 @@ fun SMSChatPage(messageInfoList: List<MessageInfo>, modifier: Modifier = Modifie
                             Spacer(modifier = Modifier.width(30.dp))
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }

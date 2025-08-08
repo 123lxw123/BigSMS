@@ -18,8 +18,8 @@ val Typography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Black,
-        fontSize = 40.sp,
-        lineHeight = 45.sp,
+        fontSize = 55.sp,
+        lineHeight = 60.sp,
         letterSpacing = 0.5.sp
     )
     /* Other default text styles to override
