@@ -13,11 +13,14 @@ import android.os.Looper
 import android.provider.ContactsContract
 import android.provider.Telephony
 import android.text.TextUtils
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,13 +33,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,7 +58,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.booleanPreferencesKey
-import com.lxw.smsreader.DataStoreUtil.dataStore
+import androidx.datastore.preferences.core.edit
+import com.lxw.smsreader.DataStoreUtil.deleteDataStore
+import com.lxw.smsreader.DataStoreUtil.readDataStore
 import com.lxw.smsreader.ui.theme.SMSReaderTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -216,6 +226,10 @@ class SMSListActivity : ComponentActivity() {
     }
 
     private fun readSmsList() {
+        GlobalScope.launch(Dispatchers.Main) {
+            viewModel.updateLoadingState(true)
+        }
+
         messageGroupMap = mutableMapOf()
         val messageGroupTempList: MutableList<MessageGroupInfo> = mutableListOf()
 
@@ -239,7 +253,7 @@ class SMSListActivity : ComponentActivity() {
         calendar.set(Calendar.MILLISECOND, 0)
         val startTime = calendar.timeInMillis
 
-        // 查询条件：最近3个月
+        // 查询条件：最近6个月
         val selection = "${Telephony.Sms.DATE} >= ?"
         val selectionArgs = arrayOf(startTime.toString())
         val cursor: Cursor? = contentResolver.query(
@@ -259,6 +273,14 @@ class SMSListActivity : ComponentActivity() {
             val indexBody = it.getColumnIndex(Telephony.Sms.BODY)
             while (it.moveToNext()) {
                 val id = it.getLong(indexId)
+                val localDeleteStatus = runBlocking {
+                    deleteDataStore.data.map { data ->
+                        data[booleanPreferencesKey(DataStoreUtil.deleteKey(id))] ?: false
+                    }.first()
+                }
+                if (localDeleteStatus) {
+                    continue
+                }
                 val type = it.getInt(indexType)
                 val address = it.getString(indexAddress)
                 val date = it.getLong(indexDate)
@@ -268,10 +290,11 @@ class SMSListActivity : ComponentActivity() {
                 val contract = getContactName(address)
                 if (read != 1) {
                     val localReadStatus = runBlocking {
-                        dataStore.data.map { data ->
-                            data[booleanPreferencesKey(DataStoreUtil.key(id))] ?: false
+                        readDataStore.data.map { data ->
+                            data[booleanPreferencesKey(DataStoreUtil.readKey(id))] ?: false
                         }.first()
                     }
+                    Log.d("SMSListActivity", " ${contract} ${time} ${localReadStatus}")
                     if (localReadStatus) {
                         read = 1
                     }
@@ -302,6 +325,7 @@ class SMSListActivity : ComponentActivity() {
             GlobalScope.launch(Dispatchers.Main) {
                 messageGroupList = messageGroupTempList
                 viewModel.updateState(messageGroupList)
+                viewModel.updateLoadingState(false)
             }
         }
     }
@@ -338,87 +362,213 @@ class SMSListActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SMSListPage(viewModel: DataViewModel, modifier: Modifier = Modifier) {
-    val messageGroups by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val messageGroups by viewModel.uiState.collectAsState()
+    val loadingStatus by viewModel.loadingState.collectAsState()
+    val dialogInfo = remember { mutableStateOf<MessageGroupInfo?>(null) }
     Column(modifier = modifier) {
-        Text(
-            text = "短信",
-            style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(16.dp, 10.dp, 16.dp, 10.dp)
-        )
-        HorizontalDivider()
-        // 列表布局
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
         ) {
-            items(messageGroups) { messageGroupInfo ->
-                val messageInfo = messageGroupInfo.messages[0]
-                Box(modifier = Modifier.clickable {
-                    val intent = Intent(context, SMSChatActivity::class.java)
-                    intent.putExtra("messages", ArrayList(messageGroupInfo.messages))
-                    context.startActivity(intent)
-                }) {
-                    Column() {
-                        Spacer(modifier = Modifier.height(15.dp))
-                        if (!TextUtils.isEmpty(messageInfo.contract)) {
-                            Text(
-                                text = messageInfo.contract!!,
-                                style = MaterialTheme.typography.displaySmall.copy(color = Color.Blue),
-                            )
-                        } else {
-                            Text(
-                                text = messageInfo.address,
-                                style = MaterialTheme.typography.displaySmall.copy(color = Color.Blue)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = messageInfo.time,
-                                style = MaterialTheme.typography.displaySmall.copy(
-                                    color = Color.DarkGray,
-                                    fontSize = 45.sp
-                                )
-                            )
-                            if (messageGroupInfo.unReadCount > 0) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(Color.Red, shape = CircleShape)
-                                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                                ) {
+            Text(
+                text = "短信",
+                style = MaterialTheme.typography.displaySmall.copy(color = Color.Black)
+            )
+            Box(modifier = Modifier.weight(1.0f))
+            TextButton(
+                onClick = {
+                    dialogInfo.value = MessageGroupInfo(DataStoreUtil.SMS_ADDRESS_ALL)
+                }
+            ) {
+                Text(
+                    text = "删除",
+                    style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
+                )
+            }
+        }
+        HorizontalDivider()
+        if (loadingStatus) {
+            // loading
+            Text(
+                text = "正在刷新短信列表...",
+                style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
+                modifier = Modifier.padding(16.dp, 80.dp, 16.dp, 10.dp)
+            )
+        } else {
+            if (messageGroups.isEmpty()) {
+                // 空列表
+                Text(
+                    text = "没有更多的短信啦",
+                    style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
+                    modifier = Modifier.padding(16.dp, 80.dp, 16.dp, 10.dp)
+                )
+            } else {
+                // 短信列表
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                ) {
+                    items(messageGroups) { messageGroupInfo ->
+                        val messageInfo = messageGroupInfo.messages[0]
+                        Box(
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    val intent = Intent(context, SMSChatActivity::class.java)
+                                    intent.putExtra(
+                                        "messages",
+                                        ArrayList(messageGroupInfo.messages)
+                                    )
+                                    context.startActivity(intent)
+                                },
+                                onLongClick = {
+                                    dialogInfo.value = messageGroupInfo
+                                }
+                            )) {
+                            Column() {
+                                Spacer(modifier = Modifier.height(15.dp))
+                                if (!TextUtils.isEmpty(messageInfo.contract)) {
                                     Text(
-                                        text = messageGroupInfo.unReadCount.toString(),
-                                        style = MaterialTheme.typography.displaySmall.copy(
-                                            color = Color.White,
-                                            fontSize = 40.sp
-                                        ),
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.align(Alignment.Center)
+                                        text = messageInfo.contract!!,
+                                        style = MaterialTheme.typography.displaySmall.copy(color = Color.Blue),
+                                    )
+                                } else {
+                                    Text(
+                                        text = messageInfo.address,
+                                        style = MaterialTheme.typography.displaySmall.copy(color = Color.Blue)
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = messageInfo.time,
+                                        style = MaterialTheme.typography.displaySmall.copy(
+                                            color = Color.DarkGray,
+                                            fontSize = 45.sp
+                                        )
+                                    )
+                                    if (messageGroupInfo.unReadCount > 0) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color.Red, shape = CircleShape)
+                                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = messageGroupInfo.unReadCount.toString(),
+                                                style = MaterialTheme.typography.displaySmall.copy(
+                                                    color = Color.White,
+                                                    fontSize = 40.sp
+                                                ),
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.align(Alignment.Center)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = messageInfo.body,
+                                    style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
+                                    textAlign = TextAlign.Start,
+                                    maxLines = 3,
+                                    fontWeight = FontWeight.Bold,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(15.dp))
+                                HorizontalDivider()
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = messageInfo.body,
-                            style = MaterialTheme.typography.displaySmall.copy(color = Color.Black),
-                            textAlign = TextAlign.Start,
-                            maxLines = 3,
-                            fontWeight = FontWeight.Bold,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(15.dp))
-                        HorizontalDivider()
                     }
                 }
             }
         }
+    }
+    if (dialogInfo.value != null) {
+        AlertDialog(
+            onDismissRequest = {
+            },
+            title = {
+                Text(
+                    text = if (TextUtils.equals(
+                            dialogInfo.value?.address,
+                            DataStoreUtil.SMS_ADDRESS_ALL
+                        )
+                    ) "是否删除所有短信？" else "是否删除联系人【${
+                        if (TextUtils.isEmpty(
+                                dialogInfo.value?.messages?.get(
+                                    0
+                                )?.contract
+                            )
+                        ) dialogInfo.value?.address else dialogInfo.value?.messages?.get(0)?.contract
+                    }】所有短信？",
+                    style = MaterialTheme.typography.displaySmall.copy(color = Color.Black)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            context.deleteDataStore.edit { preferences ->
+                                if (TextUtils.equals(
+                                        dialogInfo.value?.address,
+                                        DataStoreUtil.SMS_ADDRESS_ALL
+                                    )
+                                ) {
+                                    messageGroups.forEach { messageGroupInfo ->
+                                        messageGroupInfo.messages.forEach { messageInfo ->
+                                            preferences[booleanPreferencesKey(
+                                                DataStoreUtil.deleteKey(
+                                                    messageInfo.id
+                                                )
+                                            )] = true
+                                        }
+                                    }
+                                    viewModel.updateState(mutableListOf())
+                                } else {
+                                    dialogInfo.value?.messages?.forEach { messageInfo ->
+                                        preferences[booleanPreferencesKey(
+                                            DataStoreUtil.deleteKey(
+                                                messageInfo.id
+                                            )
+                                        )] = true
+                                    }
+                                    val newMessageGroups = messageGroups.toMutableList()
+                                    newMessageGroups.remove(dialogInfo.value)
+                                    viewModel.updateState(newMessageGroups)
+                                }
+                                dialogInfo.value = null
+                            }
+                        }
+
+                    }
+                ) {
+                    Text(
+                        "确定",
+                        style = MaterialTheme.typography.displaySmall.copy(color = Color.Blue)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        dialogInfo.value = null
+                    }
+                ) {
+                    Text(
+                        "取消",
+                        style = MaterialTheme.typography.displaySmall.copy(color = Color.DarkGray)
+                    )
+                }
+            }
+        )
     }
 }
 

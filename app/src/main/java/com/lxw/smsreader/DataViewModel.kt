@@ -12,10 +12,20 @@ class DataViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<MutableList<MessageGroupInfo>>(mutableListOf())
     val uiState: StateFlow<MutableList<MessageGroupInfo>> = _uiState
 
+    // UI 状态管理
+    private val _loadingState = MutableStateFlow(true)
+    val loadingState: StateFlow<Boolean> = _loadingState
+
     // 从子线程加载数据
     fun updateState(messageGroupList: MutableList<MessageGroupInfo>) {
         viewModelScope.launch {
             _uiState.value = messageGroupList
+        }
+    }
+
+    fun updateLoadingState(status: Boolean) {
+        viewModelScope.launch {
+            _loadingState.value = status
         }
     }
 }
